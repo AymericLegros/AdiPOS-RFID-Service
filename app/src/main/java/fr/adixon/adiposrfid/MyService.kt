@@ -9,9 +9,6 @@ import java.lang.InterruptedException
 import android.widget.Toast
 import java.util.*
 
-/**
- * Created by anildeshpande on 19/08/16.
- */
 class MyService : Service() {
     var randomNumber = 0
         private set
