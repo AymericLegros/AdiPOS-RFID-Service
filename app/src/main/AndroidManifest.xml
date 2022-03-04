@@ -19,11 +19,6 @@
             </intent-filter>
         </activity>
 
-        <!--        <service-->
-        <!--            android:name="fr.adixon.adiposrfid.RFIDService"-->
-        <!--            android:enabled="true"-->
-        <!--            android:exported="true"-->
-        <!--            android:permission="android.permission.BIND_JOB_SERVICE" />-->
         <service
             android:name="fr.adixon.adiposrfid.MyService"
             android:enabled="true"
