@@ -24,7 +24,11 @@
         <service
             android:name="fr.adixon.adiposrfid.MyService"
             android:enabled="true"
-            android:exported="true"/>
+            android:exported="true">
+            <intent-filter>
+                <action android:name="fr.adixon.adiposrfiddemo"/>
+            </intent-filter>
+        </service>
     </application>
 
 </manifest>
