@@ -1,10 +1,14 @@
 package fr.adixon.adiposrfid
 
+import android.app.NotificationChannel
+import android.app.NotificationManager
 import android.app.Service
+import android.content.Context
 import android.content.Intent
 import android.os.*
 import android.util.Log
 import android.widget.Toast
+import androidx.core.app.NotificationCompat
 import com.module.interaction.ModuleConnector
 import com.module.interaction.RXTXListener
 import com.nativec.tools.ModuleManager
@@ -12,8 +16,9 @@ import com.rfid.RFIDReaderHelper
 import com.rfid.rxobserver.RXObserver
 import com.rfid.rxobserver.bean.RXInventoryTag
 
+
 private const val MSG_SAY_HELLO = 0
-private const val RFID_START = 1
+private const val RFID_INIT = 1
 private const val RFID_TERMINATE = 2
 private const val RFID_CONNECTOR_STATUS = 3
 private const val RFID_SCAN = 4
@@ -23,7 +28,7 @@ class MyService : Service() {
     private var bIntent: Intent = Intent("fr.adixon.adiposrfid.MyService.BROADCAST_ACTION");
 
     private var mConnector: ModuleConnector = Connector()
-    private lateinit var mReaderHelper: RFIDReaderHelper
+    private var mReaderHelper: RFIDReaderHelper = RFIDReaderHelper.getDefaultHelper()
 
     private var mListener : RXTXListener = object : RXTXListener {
         override fun reciveData(btAryReceiveData: ByteArray?) {
@@ -43,6 +48,7 @@ class MyService : Service() {
             println("Connection lost! \uD83D\uDE25")
         }
     }
+
     private var rxObserver: RXObserver = object : RXObserver() {
         override fun onInventoryTag(tag: RXInventoryTag) {
             Log.d("TAG", tag.strEPC)
@@ -58,7 +64,8 @@ class MyService : Service() {
                     Toast.makeText(applicationContext, "Hello World!", Toast.LENGTH_SHORT).show()
                 }
                 RFID_SCAN -> Thread { RFIDScan() }.start()
-                RFID_TERMINATE -> RFIDTerminate()
+                RFID_INIT -> Thread { RFIDInit() }.start()
+                RFID_TERMINATE -> Thread { RFIDTerminate() }.start()
                 else -> super.handleMessage(msg)
             }
         }
@@ -70,7 +77,7 @@ class MyService : Service() {
                 ModuleManager.newInstance().uhfStatus = true
                 println("--- CONNECTÉ \uD83D\uDFE2 ---")
 
-                mReaderHelper = RFIDReaderHelper.getDefaultHelper()
+                // mReaderHelper = RFIDReaderHelper.getDefaultHelper()
                 mReaderHelper.setRXTXListener(mListener);
                 mReaderHelper.registerObserver(rxObserver)
             } else {
@@ -106,15 +113,25 @@ class MyService : Service() {
         }
     }
 
-    override fun onCreate() {
-        super.onCreate()
-        // The service is being created
+    override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
+        createNotification()
+        return START_STICKY
     }
 
-    override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
-        // The service is starting, due to a call to startService()
-        Thread { RFIDInit() }.start()
-        return START_STICKY
+    private fun createNotification() {
+        if (Build.VERSION.SDK_INT >= 26) {
+            val CHANNEL_ID = "my_channel_01"
+            val channel = NotificationChannel(
+                CHANNEL_ID,
+                "Channel human readable title",
+                NotificationManager.IMPORTANCE_DEFAULT
+            )
+            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
+            val notification = NotificationCompat.Builder(this, CHANNEL_ID)
+                .setContentTitle("")
+                .setContentText("").build()
+            startForeground(1, notification)
+        }
     }
 
     override fun onBind(intent: Intent): IBinder? {
@@ -137,6 +154,5 @@ class MyService : Service() {
     override fun onDestroy() {
         // The service is no longer used and is being destroyed
         super.onDestroy()
-        Thread { RFIDTerminate() }.start()
     }
 }
