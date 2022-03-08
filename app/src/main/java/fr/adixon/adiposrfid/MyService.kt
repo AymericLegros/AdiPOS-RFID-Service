@@ -4,29 +4,105 @@ import android.app.Service
 import android.content.Intent
 import android.os.*
 import android.util.Log
-import java.util.*
+import android.widget.Toast
+import com.module.interaction.ModuleConnector
+import com.module.interaction.RXTXListener
+import com.nativec.tools.ModuleManager
+import com.rfid.RFIDReaderHelper
+import com.rfid.rxobserver.RXObserver
+import com.rfid.rxobserver.bean.RXInventoryTag
+
+private const val MSG_SAY_HELLO = 0
+private const val RFID_START = 1
+private const val RFID_TERMINATE = 2
+private const val RFID_CONNECTOR_STATUS = 3
+private const val RFID_SCAN = 4
 
 class MyService : Service() {
-    var randomNumber = 0
-    private var mIsRandomGeneratorOn = false
-
     private lateinit var mMessenger: Messenger
     private var bIntent: Intent = Intent("fr.adixon.adiposrfid.MyService.BROADCAST_ACTION");
 
-    private inner class IncomingHandler : Handler() {
+    private var mConnector: ModuleConnector = Connector()
+    private lateinit var mReaderHelper: RFIDReaderHelper
+
+    private var mListener : RXTXListener = object : RXTXListener {
+        override fun reciveData(btAryReceiveData: ByteArray?) {
+            // TODO Auto-generated method stub
+            // Get data from RFID module
+            // println("reciveData")
+        }
+
+        override fun sendData(btArySendData: ByteArray?) {
+            // TODO Auto-generated method stub
+            // Get data sending to RFID module
+        }
+
+        override fun onLostConnect() {
+            // TODO Auto-generated method stub
+            // This method will be called once lost connection.
+            println("Connection lost! \uD83D\uDE25")
+        }
+    }
+    private var rxObserver: RXObserver = object : RXObserver() {
+        override fun onInventoryTag(tag: RXInventoryTag) {
+            Log.d("TAG", tag.strEPC)
+            bIntent.putExtra("data", "TAG: ${tag.strEPC}")
+            sendBroadcast(bIntent);
+        }
+    }
+
+    private inner class IncomingHandler() : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
             when (msg.what) {
-                GET_RANDOM_NUMBER_FLAG -> {
-                    val messageSendRandomNumber = Message.obtain(null, GET_RANDOM_NUMBER_FLAG)
-                    messageSendRandomNumber.arg1 = randomNumber
-                    try {
-                        msg.replyTo.send(messageSendRandomNumber)
-                    } catch (e: RemoteException) {
-                        Log.i(TAG, "" + e.message)
-                    }
+                MSG_SAY_HELLO -> {
+                    Toast.makeText(applicationContext, "Hello World!", Toast.LENGTH_SHORT).show()
                 }
+                RFID_SCAN -> Thread { RFIDScan() }.start()
+                RFID_TERMINATE -> RFIDTerminate()
+                else -> super.handleMessage(msg)
             }
-            super.handleMessage(msg)
+        }
+    }
+
+    private fun RFIDInit() {
+        try {
+            if (mConnector.connect("192.168.1.178", 4001)) {
+                ModuleManager.newInstance().uhfStatus = true
+                println("--- CONNECTÉ \uD83D\uDFE2 ---")
+
+                mReaderHelper = RFIDReaderHelper.getDefaultHelper()
+                mReaderHelper.setRXTXListener(mListener);
+                mReaderHelper.registerObserver(rxObserver)
+            } else {
+                println("--- ERROR: Connection impossible! \uD83D\uDE25 ---")
+            }
+        } catch (e: Exception) {
+            e.printStackTrace()
+        }
+    }
+
+    private fun RFIDScan() {
+        println("RFIDScan")
+        mReaderHelper.realTimeInventory(0xFF.toByte(), 0x01.toByte())
+    }
+
+    private fun RFIDTerminate() {
+        try {
+            println("RFIDTerminate");
+            if (mReaderHelper != null) {
+                println("mReaderHelper");
+                mReaderHelper.unRegisterObserver(rxObserver)
+            }
+            if (mConnector != null) {
+                println("disConnect");
+                mConnector.disConnect()
+            }
+
+            ModuleManager.newInstance().uhfStatus = false
+            ModuleManager.newInstance().release()
+            println("--- DÉCONNECTÉ \uD83D\uDD34 ---")
+        } catch (e: Exception) {
+            e.printStackTrace()
         }
     }
 
@@ -37,8 +113,7 @@ class MyService : Service() {
 
     override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
         // The service is starting, due to a call to startService()
-        mIsRandomGeneratorOn = true
-        Thread { startRandomNumberGenerator() }.start()
+        Thread { RFIDInit() }.start()
         return START_STICKY
     }
 
@@ -60,33 +135,8 @@ class MyService : Service() {
     }
 
     override fun onDestroy() {
-        super.onDestroy()
-        println("--------- onDestroy ---------")
-        mIsRandomGeneratorOn = false
         // The service is no longer used and is being destroyed
-    }
-
-
-    private fun startRandomNumberGenerator() {
-        while (mIsRandomGeneratorOn) {
-            try {
-                Thread.sleep(1000)
-                if (mIsRandomGeneratorOn) {
-                    val randomNumber: Int = Random().nextInt(100)
-                    Log.i(TAG, "Random Number: $randomNumber")
-
-                    bIntent.putExtra("data", "Random Number: $randomNumber")
-                    sendBroadcast(bIntent);
-                }
-            } catch (e: InterruptedException) {
-                Log.i(TAG, "Thread Interrupted")
-            }
-        }
-    }
-
-
-    companion object {
-        private val TAG = MyService::class.java.simpleName
-        const val GET_RANDOM_NUMBER_FLAG = 0
+        super.onDestroy()
+        Thread { RFIDTerminate() }.start()
     }
 }
