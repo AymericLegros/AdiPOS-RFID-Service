@@ -13,7 +13,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AdiPOSRFID">
         <service
-            android:name="fr.adixon.adiposrfid.MyService"
+            android:name="fr.adixon.adiposrfid.RFIDService"
             android:enabled="true"
             android:exported="true" />
     </application>

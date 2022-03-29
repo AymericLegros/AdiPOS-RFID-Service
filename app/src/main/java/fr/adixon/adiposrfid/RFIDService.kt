@@ -23,9 +23,9 @@ private const val RFID_CONNECTOR_STATUS = 3
 private const val RFID_SCAN_START = 4
 private const val RFID_SCAN_STOP = 5
 
-class MyService : Service() {
+class RFIDService : Service() {
     private lateinit var mMessenger: Messenger
-    private var bIntent: Intent = Intent("fr.adixon.adiposrfid.MyService.BROADCAST_ACTION");
+    private var bIntent: Intent = Intent("fr.adixon.adiposrfid.RFIDService.BROADCAST_ACTION");
 
     private var mConnector: ModuleConnector = Connector()
     private var mReaderHelper: RFIDReaderHelper = RFIDReaderHelper.getDefaultHelper()
