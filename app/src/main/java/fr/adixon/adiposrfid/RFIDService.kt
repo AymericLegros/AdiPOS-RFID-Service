@@ -3,6 +3,7 @@ package fr.adixon.adiposrfid
 import android.app.Service
 import android.content.Intent
 import android.os.*
+import android.widget.Toast
 import com.module.interaction.ModuleConnector
 import com.module.interaction.RXTXListener
 import com.nativec.tools.ModuleManager
@@ -11,6 +12,7 @@ import com.rfid.rxobserver.RXObserver
 import com.rfid.rxobserver.bean.RXInventoryTag
 import com.rfid.rxobserver.bean.RXInventoryTag.RXInventoryTagEnd
 
+private const val RFID_HELLO = 0
 private const val RFID_INIT = 1
 private const val RFID_TERMINATE = 2
 private const val RFID_CONNECTOR_STATUS = 3
@@ -73,6 +75,9 @@ class RFIDService : Service() {
         override fun handleMessage(msg: Message) {
             when (msg.what) {
                 RFID_SCAN_START -> RFIDScanStart()
+                RFID_HELLO -> {
+                    Toast.makeText(applicationContext, "Hello World!", Toast.LENGTH_SHORT).show()
+                }
                 RFID_SCAN_STOP -> RFIDScanStop()
                 else -> super.handleMessage(msg)
             }
