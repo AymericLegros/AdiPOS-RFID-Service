@@ -87,6 +87,8 @@ class RFIDService : Service() {
             // mReaderHelper = RFIDReaderHelper.getDefaultHelper()
             mReaderHelper.setRXTXListener(mListener);
             mReaderHelper.registerObserver(rxObserver)
+
+            RFIDScanStart()
         } else {
             throw Exception("--- ERROR: Connection impossible! \uD83D\uDE25 ---")
         }
