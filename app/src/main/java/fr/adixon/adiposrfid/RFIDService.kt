@@ -1,14 +1,8 @@
 package fr.adixon.adiposrfid
 
-import android.app.NotificationChannel
-import android.app.NotificationManager
 import android.app.Service
-import android.content.Context
 import android.content.Intent
 import android.os.*
-import android.widget.Toast
-import androidx.core.app.NotificationCompat
-import androidx.core.content.getSystemService
 import com.module.interaction.ModuleConnector
 import com.module.interaction.RXTXListener
 import com.nativec.tools.ModuleManager
@@ -78,7 +72,6 @@ class RFIDService : Service() {
     private inner class IncomingHandler() : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
             when (msg.what) {
-                RFID_INIT -> Thread { RFIDInit() }.start()
                 RFID_SCAN_START -> RFIDScanStart()
                 RFID_SCAN_STOP -> RFIDScanStop()
                 else -> super.handleMessage(msg)
@@ -161,6 +154,7 @@ class RFIDService : Service() {
         // A client is binding to the service with bindService()
         println("--------- onBind ---------")
         return try {
+            Thread { RFIDInit() }.start()
             mMessenger = Messenger(IncomingHandler())
             return mMessenger.binder
         } catch (e: Exception) {
