@@ -8,6 +8,7 @@ import android.content.Intent
 import android.os.*
 import android.widget.Toast
 import androidx.core.app.NotificationCompat
+import androidx.core.content.getSystemService
 import com.module.interaction.ModuleConnector
 import com.module.interaction.RXTXListener
 import com.nativec.tools.ModuleManager
@@ -16,7 +17,6 @@ import com.rfid.rxobserver.RXObserver
 import com.rfid.rxobserver.bean.RXInventoryTag
 import com.rfid.rxobserver.bean.RXInventoryTag.RXInventoryTagEnd
 
-private const val MSG_SAY_HELLO = 0
 private const val RFID_INIT = 1
 private const val RFID_TERMINATE = 2
 private const val RFID_CONNECTOR_STATUS = 3
@@ -36,7 +36,7 @@ class RFIDService : Service() {
     private var tags: ArrayList<RFIDTag> = arrayListOf();
     private var process: Boolean = false;
 
-    private var mListener : RXTXListener = object : RXTXListener {
+    private var mListener: RXTXListener = object : RXTXListener {
         override fun reciveData(btAryReceiveData: ByteArray?) {
             // TODO Auto-generated method stub
             // Get data from RFID module
@@ -78,36 +78,29 @@ class RFIDService : Service() {
     private inner class IncomingHandler() : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
             when (msg.what) {
-                MSG_SAY_HELLO -> {
-                    Toast.makeText(applicationContext, "Hello World!", Toast.LENGTH_SHORT).show()
-                }
                 RFID_INIT -> Thread { RFIDInit() }.start()
                 RFID_SCAN_START -> RFIDScanStart()
                 RFID_SCAN_STOP -> RFIDScanStop()
-                RFID_TERMINATE -> Thread { RFIDTerminate() }.start()
                 else -> super.handleMessage(msg)
             }
         }
     }
 
     private fun RFIDInit() {
-        try {
-            if (mConnector.connect("192.168.1.178", 4001)) {
-                ModuleManager.newInstance().uhfStatus = true
-                println("--- CONNECTED \uD83D\uDFE2 ---")
+        if (mConnector.connect("192.168.1.178", 4001)) {
+            println("--- CONNECTED \uD83D\uDFE2 ---")
+            ModuleManager.newInstance().uhfStatus = true
 
-                // mReaderHelper = RFIDReaderHelper.getDefaultHelper()
-                mReaderHelper.setRXTXListener(mListener);
-                mReaderHelper.registerObserver(rxObserver)
-            } else {
-                println("--- ERROR: Connection impossible! \uD83D\uDE25 ---")
-            }
-        } catch (e: Exception) {
-            e.printStackTrace()
+            // mReaderHelper = RFIDReaderHelper.getDefaultHelper()
+            mReaderHelper.setRXTXListener(mListener);
+            mReaderHelper.registerObserver(rxObserver)
+        } else {
+            throw Exception("--- ERROR: Connection impossible! \uD83D\uDE25 ---")
         }
     }
 
     private fun RFIDScanStart() {
+        println("----- RFIDScanStart -----")
         if (process) return
         process = true
 
@@ -116,7 +109,7 @@ class RFIDService : Service() {
         timerHandler = Handler(Looper.getMainLooper())
         timerHandler.postDelayed(sendTags, timerDelay)
 
-        Thread{ RFIDScan() }.start()
+        Thread { RFIDScan() }.start()
 
         loopScan = true
     }
@@ -127,6 +120,7 @@ class RFIDService : Service() {
 
     private fun RFIDScanStop() {
         if (!process) return
+        println("------ RFIDScanStop ------");
         process = false
 
         timerHandler.removeCallbacks(sendTags)
@@ -138,6 +132,8 @@ class RFIDService : Service() {
 
     private fun RFIDTerminate() {
         try {
+            if (process) RFIDScanStop()
+            println("------ RFIDTerminate ------");
             mReaderHelper.unRegisterObserver(rxObserver)
             mConnector.disConnect()
 
@@ -161,35 +157,22 @@ class RFIDService : Service() {
         }
     }
 
-    private fun createNotification() {
-        if (Build.VERSION.SDK_INT >= 26) {
-            val CHANNEL_ID = "my_channel_01"
-            val channel = NotificationChannel(
-                CHANNEL_ID,
-                "Channel human readable title",
-                NotificationManager.IMPORTANCE_DEFAULT
-            )
-            (getSystemService(Context.NOTIFICATION_SERVICE) as NotificationManager).createNotificationChannel(channel)
-            val notification = NotificationCompat.Builder(this, CHANNEL_ID)
-                .setContentTitle("")
-                .setContentText("").build()
-            startForeground(1, notification)
-        }
-    }
-
-    override fun onStartCommand(intent: Intent, flags: Int, startId: Int): Int {
-        createNotification()
-        return START_STICKY
-    }
-
     override fun onBind(intent: Intent): IBinder? {
         // A client is binding to the service with bindService()
-        mMessenger = Messenger(IncomingHandler())
-        return mMessenger.binder
+        println("--------- onBind ---------")
+        return try {
+            mMessenger = Messenger(IncomingHandler())
+            return mMessenger.binder
+        } catch (e: Exception) {
+            e.printStackTrace()
+            null
+        }
     }
 
     override fun onUnbind(intent: Intent): Boolean {
         // All clients have unbound with unbindService()
+        println("--------- onUnbind ---------")
+        Thread { RFIDTerminate() }.start()
         return super.onUnbind(intent)
     }
 
@@ -198,9 +181,4 @@ class RFIDService : Service() {
         // after onUnbind() has already been called
         super.onRebind(intent)
     }
-
-//    override fun onDestroy() {
-//        // The service is no longer used and is being destroyed
-//        super.onDestroy()
-//    }
 }

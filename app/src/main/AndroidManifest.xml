@@ -3,7 +3,6 @@
     package="fr.adixon.adiposrfid">
 
     <uses-permission android:name="android.permission.INTERNET" />
-    <uses-permission android:name="android.permission.FOREGROUND_SERVICE" />
 
     <application
         android:allowBackup="true"
@@ -13,7 +12,7 @@
         android:supportsRtl="true"
         android:theme="@style/Theme.AdiPOSRFID">
         <service
-            android:name="fr.adixon.adiposrfid.RFIDService"
+            android:name=".RFIDService"
             android:enabled="true"
             android:exported="true" />
     </application>
