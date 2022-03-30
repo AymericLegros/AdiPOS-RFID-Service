@@ -34,6 +34,7 @@ class RFIDService : Service() {
     private var timerDelay: Long = 1000
     private var loopScan: Boolean = false;
     private var tags: ArrayList<RFIDTag> = arrayListOf();
+    private var process: Boolean = false;
 
     private var mListener : RXTXListener = object : RXTXListener {
         override fun reciveData(btAryReceiveData: ByteArray?) {
@@ -50,7 +51,7 @@ class RFIDService : Service() {
         override fun onLostConnect() {
             // TODO Auto-generated method stub
             // This method will be called once lost connection.
-            println("Connection lost! \uD83D\uDE25")
+            println("--- ERROR: Connection lost! \uD83D\uDE25 ---")
         }
     }
 
@@ -107,10 +108,13 @@ class RFIDService : Service() {
     }
 
     private fun RFIDScanStart() {
-        timerHandler = Handler(Looper.getMainLooper())
-        timerHandler.postDelayed(sendTags, timerDelay)
+        if (process) return
+        process = true
 
         tags.clear()
+
+        timerHandler = Handler(Looper.getMainLooper())
+        timerHandler.postDelayed(sendTags, timerDelay)
 
         Thread{ RFIDScan() }.start()
 
@@ -122,6 +126,9 @@ class RFIDService : Service() {
     }
 
     private fun RFIDScanStop() {
+        if (!process) return
+        process = false
+
         timerHandler.removeCallbacks(sendTags)
 
         loopScan = false
@@ -131,10 +138,7 @@ class RFIDService : Service() {
 
     private fun RFIDTerminate() {
         try {
-            println("RFIDTerminate");
-            println("mReaderHelper");
             mReaderHelper.unRegisterObserver(rxObserver)
-            println("disConnect");
             mConnector.disConnect()
 
             ModuleManager.newInstance().uhfStatus = false
@@ -147,13 +151,10 @@ class RFIDService : Service() {
 
     private val sendTags = object : Runnable {
         override fun run() {
-
             val currTimestamp: Long = System.currentTimeMillis()
-            val updatedTags = tags.filter { currTimestamp - it.timestamp < 5000 }
-            tags = updatedTags as ArrayList<RFIDTag>
-
-
-            bIntent.putParcelableArrayListExtra("fr.adixon.adiposrfid.AllTags", tags)
+            val validTags = tags.filter { currTimestamp - it.timestamp < 5000 }
+            val formattedTag = validTags.map { it.code } as ArrayList<String>;
+            bIntent.putStringArrayListExtra("fr.adixon.adiposrfid.AllTags", formattedTag)
             sendBroadcast(bIntent);
 
             timerHandler.postDelayed(this, timerDelay)
