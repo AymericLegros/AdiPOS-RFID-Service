@@ -4,11 +4,14 @@ import android.app.Service
 import android.content.Intent
 import android.os.*
 import com.module.interaction.ModuleConnector
+import com.module.interaction.ReaderHelper
 import com.nativec.tools.ModuleManager
 import com.rfid.RFIDReaderHelper
+import com.rfid.bean.MessageTran
 import com.rfid.rxobserver.RXObserver
 import com.rfid.rxobserver.bean.RXInventoryTag
-import com.rfid.rxobserver.bean.RXInventoryTag.RXInventoryTagEnd
+
+// import com.rfid.RFIDReaderHelper;
 
 
 private const val RFID_HELLO = 0
@@ -29,7 +32,7 @@ class RFIDService : Service() {
     private var bIntent: Intent = Intent("fr.adixon.adiposrfid.RFIDService.BROADCAST_ACTION")
 
     private var mConnector: ModuleConnector = Connector()
-    private var mReaderHelper: RFIDReaderHelper = RFIDReaderHelper.getDefaultHelper()
+    private lateinit var mReaderHelper: RFIDReaderHelper;
 
     private lateinit var timerHandler: Handler
     private var timerDelay: Long = 1000
@@ -44,16 +47,8 @@ class RFIDService : Service() {
 
     private var rxObserver: RXObserver = object : RXObserver() {
         override fun onInventoryTag(tag: RXInventoryTag) {
-//            println("------- TAG -------")
-//            println("mReadCount: " + tag.mReadCount)
-//            println("cmd: " + tag.cmd)
-//            println("strCRC: " + tag.strCRC)
-//            println("strEPC: " + tag.strEPC)
-//            println("btAntId: " + tag.btAntId)
-//            println("strFreq: " + tag.strFreq)
-//            println("strPC: " + tag.strPC)
-//            println("strRSSI: " + tag.strRSSI)
-//            println("------- --- -------")
+//            println("------ tag.btAntId -------")
+//            println(tag.btAntId)
             val tagFound = tags.find { it.code == tag.strEPC }
 
             if (tagFound != null) {
@@ -65,7 +60,13 @@ class RFIDService : Service() {
 
         }
 
-        override fun onInventoryTagEnd(tagEnd: RXInventoryTagEnd?) {
+//        override fun onInventoryTagEnd(tagEnd: RXInventoryTagEnd?) {
+//            if (loopScan) {
+//                Thread { RFIDScan() }.start()
+//            }
+//        }
+
+        override fun onFastSwitchAntInventoryTagEnd(tagEnd: RXInventoryTag.RXFastSwitchAntInventoryTagEnd) {
             if (loopScan) {
                 Thread { RFIDScan() }.start()
             }
@@ -88,20 +89,37 @@ class RFIDService : Service() {
 
     private fun RFIDInit() {
         Thread {
-            val ip: String? = mData.getString("ip")
-            val port: Int = mData.getInt("port")
-            if (mConnector.connect(ip, port)) {
-                println("--- CONNECTED \uD83D\uDFE2 ---")
-                ModuleManager.newInstance().uhfStatus = true
+            try {
+                val ip: String? = mData.getString("ip")
+                val port: Int = mData.getInt("port")
+                if (mConnector.connect(ip, port)) {
+                    println("--- CONNECTED \uD83D\uDFE2 ---")
+                    ModuleManager.newInstance().uhfStatus = true
 
-                // mReaderHelper = RFIDReaderHelper.getDefaultHelper()
-                // mReaderHelper.setRXTXListener(mListener);
-                mReaderHelper.registerObserver(rxObserver)
-                // println(mReaderHelper.getAntConnectionDetector(0xFF.toByte()))
-                RFIDScanStart()
-            } else {
-                val newMsg = Message.obtain(null, CONNECTION_READER_UNAVAILABLE, 0, 0)
-                rMessenger.send(newMsg)
+
+                    mReaderHelper = RFIDReaderHelper.getDefaultHelper()
+                    println(mReaderHelper);
+                    // mReaderHelper.setRXTXListener(mListener);
+                    mReaderHelper.registerObserver(rxObserver)
+
+//                 mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x04.toByte()) // 1
+//                mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x01.toByte()) // 2
+//                mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x02.toByte()) // 3
+//                mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x03.toByte()) // 4
+//                mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x04.toByte())
+//                mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x05.toByte())
+//                mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x06.toByte())
+//                mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x07.toByte())
+                    // println(mReaderHelper.getWorkAntenna(0xFF.toByte()))
+
+                    RFIDScanStart()
+                } else {
+                    val newMsg = Message.obtain(null, CONNECTION_READER_UNAVAILABLE, 0, 0)
+                    rMessenger.send(newMsg)
+                }
+            } catch(e: Exception) {
+                println("---------- INIT -----------")
+                e.printStackTrace()
             }
         }.start()
     }
@@ -123,7 +141,9 @@ class RFIDService : Service() {
     }
 
     private fun RFIDScan() {
-        mReaderHelper.realTimeInventory(0xFF.toByte(), 0x01.toByte())
+        fastSwitchAntInventory(0xFF.toByte(), 0x00.toByte(), 0x01.toByte(), 0x01.toByte(), 0x01.toByte(), 0x02.toByte(), 0x01.toByte(), 0x03.toByte(), 0x01.toByte(), 0x04.toByte(), 0x01.toByte(), 0x05.toByte(), 0x01.toByte(), 0x06.toByte(), 0x01.toByte(), 0x07.toByte(), 0x01.toByte(), 0x00.toByte(), 0x08.toByte());
+        // mReaderHelper.fastSwitchAntInventory(0xFF.toByte(), 0x00.toByte(), 0x01.toByte(), 0x01.toByte(), 0x01.toByte(), 0x02.toByte(), 0x01.toByte(), 0x03.toByte(), 0x01.toByte(), 0x00.toByte(), 0x08.toByte());
+        // mReaderHelper.realTimeInventory(0xFF.toByte(), 0x01.toByte())
     }
 
     private fun RFIDScanStop() {
@@ -159,7 +179,7 @@ class RFIDService : Service() {
     private val sendTags = object : Runnable {
         override fun run() {
             val currTimestamp: Long = System.currentTimeMillis()
-            val validTags = tags.filter { currTimestamp - it.timestamp < 5000 }
+            val validTags = tags.filter { currTimestamp - it.timestamp < 1000 }
             val formattedTags = validTags.map { it.code } as ArrayList<String>
             bIntent.putStringArrayListExtra("fr.adixon.adiposrfid.AllTags", formattedTags)
             sendBroadcast(bIntent)
@@ -204,5 +224,38 @@ class RFIDService : Service() {
         // A client is binding to the service with bindService(),
         // after onUnbind() has already been called
         super.onRebind(intent)
+    }
+
+
+    private fun fastSwitchAntInventory(
+        btReadId: Byte,
+        btA: Byte,
+        btStayA: Byte,
+        btB: Byte,
+        btStayB: Byte,
+        btC: Byte,
+        btStayC: Byte,
+        btD: Byte,
+        btStayD: Byte,
+        btE: Byte,
+        btStayE: Byte,
+        btF: Byte,
+        btStayF: Byte,
+        btG: Byte,
+        btStayG: Byte,
+        btH: Byte,
+        btStayH: Byte,
+        btInterval: Byte,
+        btRepeat: Byte
+    ): Int {
+        val btCmd: Byte = -118
+        val btAryData = byteArrayOf(btA, btStayA, btB, btStayB, btC, btStayC, btD, btStayD, btE, btStayE, btF, btStayF, btG, btStayG, btH, btStayH, btInterval, btRepeat)
+        return sendMessage(btReadId, btCmd, btAryData)
+    }
+
+
+    private fun sendMessage(btReadId: Byte, btCmd: Byte, btAryData: ByteArray): Int {
+        val msgTran = MessageTran(btReadId, btCmd, btAryData)
+        return mReaderHelper.sendCommand(msgTran.aryTranData)
     }
 }
