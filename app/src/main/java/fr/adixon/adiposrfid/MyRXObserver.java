@@ -614,12 +614,7 @@ public class MyRXObserver implements Observer {
         if (btAryData.length == 1) {
             this.onExeCMDStatus(btCmd, btAryData[0]);
         } else if (btAryData.length == 2) {
-            if (btAryData[1] == 0x22) {
-                /// String strLog = "MISSING_ANT " + toString(btAryData[0] + 1);
-                this.onExeCMDStatus(btCmd, btAryData[1], "PRESQUE");
-            } else {
-                this.onExeCMDStatus(btCmd, btAryData[1]);
-            }
+            this.onExeCMDStatus(btCmd, btAryData);
         } else {
             int nSwitchTotal;
             int nSwitchTime;
@@ -843,7 +838,7 @@ public class MyRXObserver implements Observer {
     protected void onExeCMDStatus(byte cmd, byte status) {
     }
 
-    protected void onExeCMDStatus(byte cmd, byte status, String error) {
+    protected void onExeCMDStatus(byte cmd, byte[] status) {
     }
 
     protected void onInventoryTag(RXInventoryTag tag) {

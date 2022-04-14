@@ -8,7 +8,6 @@ import com.module.interaction.RXTXListener
 import com.nativec.tools.ModuleManager
 import com.rfid.RFIDReaderHelper
 import com.rfid.bean.MessageTran
-import com.rfid.rxobserver.RXObserver
 import com.rfid.rxobserver.bean.RXInventoryTag
 
 private const val RFID_HELLO = 0
@@ -24,6 +23,7 @@ private const val NETWORK_UNAVAILABLE = 101
 private const val SERVICE_UNAVAILABLE = 102
 private const val CONNECTION_READER_UNAVAILABLE = 103
 private const val SCAN_UNAVAILABLE = 104
+private const val MISSING_ANTENNA = 105
 
 class RFIDService : Service() {
     private var bIntent: Intent = Intent("fr.adixon.adiposrfid.RFIDService.BROADCAST_ACTION")
@@ -41,6 +41,8 @@ class RFIDService : Service() {
 
     private lateinit var mMessenger: Messenger
     private lateinit var rMessenger: Messenger
+
+    private var missingAnts: ArrayList<Int> = arrayListOf()
 
     private var rxObserver: MyRXObserver = object : MyRXObserver() {
         override fun onInventoryTag(tag: RXInventoryTag) {
@@ -73,10 +75,13 @@ class RFIDService : Service() {
             // System.out.format("CDM:%s  Execute status:%S", String.format("%02X", cmd), String.format("%02x", status))
         }
 
-        override fun onExeCMDStatus(cmd: Byte, status: Byte, error: String) {
-            println("-------- NEW onExeCMDStatus --------");
-
-            println(error)
+        override fun onExeCMDStatus(cmd: Byte, btAryData: ByteArray) {
+            if (btAryData[1] == 0x22.toByte()) {
+                val ant = btAryData[0] + 1
+                if (!missingAnts.contains(ant)) {
+                    missingAnts.add(ant)
+                }
+            }
         }
     }
 
@@ -221,15 +226,27 @@ class RFIDService : Service() {
 
             // INTERRUPT FOR TEST
             if (testMode && currTimestamp - mTimestamp > 3000) {
+                println("---- SEND TEST RESULT ----")
+
+                if (missingAnts.size > 0) {
+                    val newMsg = Message.obtain(null, MISSING_ANTENNA, 0, 0)
+                    val mData = Bundle()
+                    mData.putIntegerArrayList("data", missingAnts)
+                    newMsg.data = mData
+                    rMessenger.send(newMsg)
+                    return RFIDScanStop()
+                }
+
                 if (loopScan && formattedTags.size <= 0) {
                     val newMsg = Message.obtain(null, SCAN_UNAVAILABLE, 0, 0)
                     rMessenger.send(newMsg)
-                } else {
-                    val newMsg = Message.obtain(null, TEST_SUCCESS, 0, 0)
-                    rMessenger.send(newMsg)
+                    return RFIDScanStop()
                 }
 
-                RFIDScanStop()
+                val newMsg = Message.obtain(null, TEST_SUCCESS, 0, 0)
+                rMessenger.send(newMsg)
+                return RFIDScanStop()
+
             }
         }
     }
