@@ -4,15 +4,12 @@ import android.app.Service
 import android.content.Intent
 import android.os.*
 import com.module.interaction.ModuleConnector
-import com.module.interaction.ReaderHelper
+import com.module.interaction.RXTXListener
 import com.nativec.tools.ModuleManager
 import com.rfid.RFIDReaderHelper
 import com.rfid.bean.MessageTran
 import com.rfid.rxobserver.RXObserver
 import com.rfid.rxobserver.bean.RXInventoryTag
-
-// import com.rfid.RFIDReaderHelper;
-
 
 private const val RFID_HELLO = 0
 private const val RFID_INIT = 1
@@ -45,33 +42,60 @@ class RFIDService : Service() {
     private lateinit var mMessenger: Messenger
     private lateinit var rMessenger: Messenger
 
-    private var rxObserver: RXObserver = object : RXObserver() {
+    private var rxObserver: MyRXObserver = object : MyRXObserver() {
         override fun onInventoryTag(tag: RXInventoryTag) {
-//            println("------ tag.btAntId -------")
-//            println(tag.btAntId)
-            val tagFound = tags.find { it.code == tag.strEPC }
+            try {
+                val tagFound = tags.find { it.code == tag.strEPC }
 
-            if (tagFound != null) {
-                tagFound.increment()
-            } else {
-                val newTag = RFIDTag(tag.strEPC)
-                tags.add(newTag)
+                if (tagFound != null) {
+                    tagFound.increment()
+                } else {
+                    val newTag = RFIDTag(tag.strEPC)
+                    tags.add(newTag)
+                }
+            } catch (e: Exception) {
+                println("-------- onInventoryTag ---------")
+                e.printStackTrace()
             }
 
         }
-
-//        override fun onInventoryTagEnd(tagEnd: RXInventoryTagEnd?) {
-//            if (loopScan) {
-//                Thread { RFIDScan() }.start()
-//            }
-//        }
 
         override fun onFastSwitchAntInventoryTagEnd(tagEnd: RXInventoryTag.RXFastSwitchAntInventoryTagEnd) {
             if (loopScan) {
                 Thread { RFIDScan() }.start()
             }
         }
+
+        override fun onExeCMDStatus(cmd: Byte, status: Byte) {
+            println("-------- onExeCMDStatus --------");
+
+            println(cmd)
+            // System.out.format("CDM:%s  Execute status:%S", String.format("%02X", cmd), String.format("%02x", status))
+        }
+
+        override fun onExeCMDStatus(cmd: Byte, status: Byte, error: String) {
+            println("-------- NEW onExeCMDStatus --------");
+
+            println(error)
+        }
     }
+
+    private var mListener: RXTXListener = object : RXTXListener {
+        override fun reciveData(p0: ByteArray) {
+            // println("------------- reciveData -------------");
+//            println(p0.toList())
+//            p0.forEach { println(it); }
+        }
+
+        override fun sendData(p0: ByteArray?) {
+            // TODO("Not yet implemented")
+        }
+
+        override fun onLostConnect() {
+            // TODO("Not yet implemented")
+        }
+    }
+
 
     private inner class IncomingHandler() : Handler(Looper.getMainLooper()) {
         override fun handleMessage(msg: Message) {
@@ -96,30 +120,20 @@ class RFIDService : Service() {
                     println("--- CONNECTED \uD83D\uDFE2 ---")
                     ModuleManager.newInstance().uhfStatus = true
 
-
                     mReaderHelper = RFIDReaderHelper.getDefaultHelper()
-                    println(mReaderHelper);
-                    // mReaderHelper.setRXTXListener(mListener);
                     mReaderHelper.registerObserver(rxObserver)
-
-//                 mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x04.toByte()) // 1
-//                mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x01.toByte()) // 2
-//                mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x02.toByte()) // 3
-//                mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x03.toByte()) // 4
-//                mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x04.toByte())
-//                mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x05.toByte())
-//                mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x06.toByte())
-//                mReaderHelper.setWorkAntenna(0xFF.toByte(), 0x07.toByte())
-                    // println(mReaderHelper.getWorkAntenna(0xFF.toByte()))
+                    // mReaderHelper.setRXTXListener(mListener)
+                    mReaderHelper.getAntConnectionDetector(0xFF.toByte())
 
                     RFIDScanStart()
                 } else {
                     val newMsg = Message.obtain(null, CONNECTION_READER_UNAVAILABLE, 0, 0)
                     rMessenger.send(newMsg)
                 }
-            } catch(e: Exception) {
-                println("---------- INIT -----------")
+            } catch (e: Exception) {
+                println("---------- ERROR: RFIDInit -----------")
                 e.printStackTrace()
+                RFIDTerminate()
             }
         }.start()
     }
@@ -141,7 +155,27 @@ class RFIDService : Service() {
     }
 
     private fun RFIDScan() {
-        fastSwitchAntInventory(0xFF.toByte(), 0x00.toByte(), 0x01.toByte(), 0x01.toByte(), 0x01.toByte(), 0x02.toByte(), 0x01.toByte(), 0x03.toByte(), 0x01.toByte(), 0x04.toByte(), 0x01.toByte(), 0x05.toByte(), 0x01.toByte(), 0x06.toByte(), 0x01.toByte(), 0x07.toByte(), 0x01.toByte(), 0x00.toByte(), 0x08.toByte());
+        fastSwitchAntInventory(
+            0xFF.toByte(),
+            0x00.toByte(),
+            0x01.toByte(),
+            0x01.toByte(),
+            0x01.toByte(),
+            0x02.toByte(),
+            0x01.toByte(),
+            0x03.toByte(),
+            0x01.toByte(),
+            0x04.toByte(),
+            0x01.toByte(),
+            0x05.toByte(),
+            0x01.toByte(),
+            0x06.toByte(),
+            0x01.toByte(),
+            0x07.toByte(),
+            0x01.toByte(),
+            0x00.toByte(),
+            0x08.toByte()
+        );
         // mReaderHelper.fastSwitchAntInventory(0xFF.toByte(), 0x00.toByte(), 0x01.toByte(), 0x01.toByte(), 0x01.toByte(), 0x02.toByte(), 0x01.toByte(), 0x03.toByte(), 0x01.toByte(), 0x00.toByte(), 0x08.toByte());
         // mReaderHelper.realTimeInventory(0xFF.toByte(), 0x01.toByte())
     }
@@ -160,11 +194,10 @@ class RFIDService : Service() {
     private fun RFIDTerminate() {
         Thread {
             try {
-                if (loopScan) {
-                    RFIDScanStop()
-                }
+                if (loopScan) RFIDScanStop()
                 println("------ RFIDTerminate ------")
                 mReaderHelper.unRegisterObserver(rxObserver)
+                mReaderHelper.setRXTXListener(null);
                 mConnector.disConnect()
 
                 ModuleManager.newInstance().uhfStatus = false
@@ -179,7 +212,7 @@ class RFIDService : Service() {
     private val sendTags = object : Runnable {
         override fun run() {
             val currTimestamp: Long = System.currentTimeMillis()
-            val validTags = tags.filter { currTimestamp - it.timestamp < 1000 }
+            val validTags = tags.filter { currTimestamp - it.updatedAt < 1000 }
             val formattedTags = validTags.map { it.code } as ArrayList<String>
             bIntent.putStringArrayListExtra("fr.adixon.adiposrfid.AllTags", formattedTags)
             sendBroadcast(bIntent)
@@ -249,10 +282,28 @@ class RFIDService : Service() {
         btRepeat: Byte
     ): Int {
         val btCmd: Byte = -118
-        val btAryData = byteArrayOf(btA, btStayA, btB, btStayB, btC, btStayC, btD, btStayD, btE, btStayE, btF, btStayF, btG, btStayG, btH, btStayH, btInterval, btRepeat)
+        val btAryData = byteArrayOf(
+            btA,
+            btStayA,
+            btB,
+            btStayB,
+            btC,
+            btStayC,
+            btD,
+            btStayD,
+            btE,
+            btStayE,
+            btF,
+            btStayF,
+            btG,
+            btStayG,
+            btH,
+            btStayH,
+            btInterval,
+            btRepeat
+        )
         return sendMessage(btReadId, btCmd, btAryData)
     }
-
 
     private fun sendMessage(btReadId: Byte, btCmd: Byte, btAryData: ByteArray): Int {
         val msgTran = MessageTran(btReadId, btCmd, btAryData)
