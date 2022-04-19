@@ -47,12 +47,18 @@ class RFIDService : Service() {
     private var rxObserver: MyRXObserver = object : MyRXObserver() {
         override fun onInventoryTag(tag: RXInventoryTag) {
             try {
+                // if (tag.strRSSI.toInt() < 100) return
                 val tagFound = tags.find { it.code == tag.strEPC }
 
                 if (tagFound != null) {
-                    tagFound.increment()
+                    if (tagFound.code == "E2 80 68 94 00 00 50 16 87 E5 1D 39") {
+                        // println("--------- SPEED ---------");
+                        println("SPEED:${tagFound.averageSpeed} DISTANCE:${tagFound.averageDistance}")
+                        // println("SPEED:${tagFound.speed} COUNT:${tagFound.count} LAST:${tagFound.lastUpdate} DURATION:${tagFound.duration}");
+                    }
+                    tagFound.update(tag.strRSSI)
                 } else {
-                    val newTag = RFIDTag(tag.strEPC)
+                    val newTag = RFIDTag(tag.strEPC, tag.strRSSI)
                     tags.add(newTag)
                 }
             } catch (e: Exception) {
@@ -217,8 +223,8 @@ class RFIDService : Service() {
     private val sendTags = object : Runnable {
         override fun run() {
             val currTimestamp: Long = System.currentTimeMillis()
-            val validTags = tags.filter { currTimestamp - it.updatedAt < 1000 }
-            val formattedTags = validTags.map { it.code } as ArrayList<String>
+            tags.removeIf { currTimestamp - it.updatedAt > 1000 }
+            val formattedTags = tags.map { it.code } as ArrayList<String>
             bIntent.putStringArrayListExtra("fr.adixon.adiposrfid.AllTags", formattedTags)
             sendBroadcast(bIntent)
 
