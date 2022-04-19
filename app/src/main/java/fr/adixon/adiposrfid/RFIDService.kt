@@ -126,8 +126,7 @@ class RFIDService : Service() {
         Thread {
             try {
                 val ip: String? = mData.getString("ip")
-                val port: Int = mData.getInt("port")
-                if (mConnector.connect(ip, port)) {
+                if (mConnector.connect(ip, 4001)) {
                     println("--- CONNECTED \uD83D\uDFE2 ---")
                     ModuleManager.newInstance().uhfStatus = true
 
